@@ -1,22 +1,23 @@
 from fastapi import FastAPI
-from database import connect_db, close_db
-from routers import instructor, course, student, enrollment
+from database import mongodb
+from routers import instructor, student, course, enrollment
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Course Selling API")
+# Lifespan context
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await mongodb.connect()
+    yield
+    await mongodb.close()
 
-@app.on_event("startup")
-async def startup():
-    connect_db()
+app = FastAPI(title="Course Selling API", lifespan=lifespan)
 
-@app.on_event("shutdown")
-async def shutdown():
-    close_db()
+# Include routers
+app.include_router(instructor.router)
+app.include_router(student.router)
+app.include_router(course.router)
+app.include_router(enrollment.router)
 
 @app.get("/")
 async def root():
-    return {"message: Course Selling API is running"}
-
-app.include_router(instructor.router, prefix="/instructors", tags=["Instructors"])
-app.include_router(course.router, prefix="/courses", tags=["Courses"])
-app.include_router(student.router, prefix="/students", tags=["Students"])
-app.include_router(enrollment.router, prefix="/enrollments", tags=["Enrollments"])
+    return {"message": "Course Selling API is running!"}

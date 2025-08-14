@@ -1,12 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class Course(BaseModel):
-    title: str           # Course title
-    description: str     # Short description
-    instructor_id: str   # ID of the instructor who owns this course
-    price: Optional[float] = 0.0  # Optional price
-
-# Optional: You can create a response model with ID
-class CourseResponse(Course):
-    id: str
+    title: str = Field(..., example="Python for Beginners")
+    description: Optional[str] = Field(None, example="Learn Python from scratch")
+    instructor_id: str = Field(..., example="instructor123")
+    price: float = Field(..., example=49.99)

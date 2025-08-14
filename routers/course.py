@@ -1,44 +1,53 @@
 from fastapi import APIRouter, HTTPException
-from models.course import Course
-import crud.course as course_crud
+from crud import course as course_crud
+from pydantic import BaseModel
+from bson import ObjectId
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 
-# List all courses
+class CourseCreate(BaseModel):
+    title: str
+    description: str
+    price: float
+    instructor_id: str
+
+class CourseUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    price: float | None = None
+    instructor_id: str | None = None
+
+def validate_object_id(id_str: str) -> str:
+    try:
+        return str(ObjectId(id_str))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
 @router.get("/")
 async def get_courses():
-    return await course_crud.list_courses()
+    return await course_crud.get_all()
 
-# Create a course
+@router.get("/{course_id}")
+async def get_course(course_id: str):
+    course_id = validate_object_id(course_id)
+    course = await course_crud.get_one(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return course
+
 @router.post("/")
-async def add_course(course: Course):
-    return await course_crud.create_course(course.dict())
+async def create_course(data: CourseCreate):
+    return await course_crud.create(data.dict())
 
-# Get course by ID
-@router.get("/{id}")
-async def get_course(id: str):
-    course = await course_crud.get_course(id)
-    if course:
-        return course
-    raise HTTPException(status_code=404, detail="Course not found")
+@router.put("/{course_id}")
+async def update_course(course_id: str, data: CourseUpdate):
+    course_id = validate_object_id(course_id)
+    updated = await course_crud.update(course_id, data.dict(exclude_none=True))
+    if not updated:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return updated
 
-# Update course
-@router.put("/{id}")
-async def update_course(id: str, course: Course):
-    updated = await course_crud.update_course(id, course.dict())
-    if updated:
-        return updated
-    raise HTTPException(status_code=404, detail="Course not found")
-
-# Delete course
-@router.delete("/{id}")
-async def delete_course(id: str):
-    result = await course_crud.delete_course(id)
-    if result["deleted_count"]:
-        return {"message": "Course deleted"}
-    raise HTTPException(status_code=404, detail="Course not found")
-
-# Get all courses by instructor
-@router.get("/instructor/{instructor_id}")
-async def get_courses_by_instructor(instructor_id: str):
-    return await course_crud.get_courses_by_instructor(instructor_id)
+@router.delete("/{course_id}")
+async def delete_course(course_id: str):
+    course_id = validate_object_id(course_id)
+    return await course_crud.delete(course_id)

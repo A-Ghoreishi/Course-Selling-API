@@ -1,39 +1,49 @@
 from fastapi import APIRouter, HTTPException
-from models.student import Student
-import crud.student as student_crud
+from crud import student as student_crud
+from pydantic import BaseModel
+from bson import ObjectId
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
-# List all students
+class StudentCreate(BaseModel):
+    name: str
+    email: str
+
+class StudentUpdate(BaseModel):
+    name: str | None = None
+    email: str | None = None
+
+def validate_object_id(id_str: str) -> str:
+    try:
+        return str(ObjectId(id_str))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
 @router.get("/")
 async def get_students():
-    return await student_crud.list_students()
+    return await student_crud.get_all()
 
-# Create a student
+@router.get("/{student_id}")
+async def get_student(student_id: str):
+    student_id = validate_object_id(student_id)
+    student = await student_crud.get_one(student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return student
+
 @router.post("/")
-async def add_student(student: Student):
-    return await student_crud.create_student(student.dict())
+async def create_student(data: StudentCreate):
+    return await student_crud.create(data.dict())
 
-# Get student by ID
-@router.get("/{id}")
-async def get_student(id: str):
-    student = await student_crud.get_student(id)
-    if student:
-        return student
-    raise HTTPException(status_code=404, detail="Student not found")
+@router.put("/{student_id}")
+async def update_student(student_id: str, data: StudentUpdate):
+    student_id = validate_object_id(student_id)
+    updated = await student_crud.update(student_id, data.dict(exclude_none=True))
+    if not updated:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return updated
 
-# Update student
-@router.put("/{id}")
-async def update_student(id: str, student: Student):
-    updated = await student_crud.update_student(id, student.dict())
-    if updated:
-        return updated
-    raise HTTPException(status_code=404, detail="Student not found")
-
-# Delete student
-@router.delete("/{id}")
-async def delete_student(id: str):
-    result = await student_crud.delete_student(id)
-    if result["deleted_count"]:
-        return {"message": "Student deleted"}
-    raise HTTPException(status_code=404, detail="Student not found")
+@router.delete("/{student_id}")
+async def delete_student(student_id: str):
+    student_id = validate_object_id(student_id)
+    return await student_crud.delete(student_id)

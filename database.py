@@ -1,18 +1,30 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
 
-client: Optional[AsyncIOMotorClient] = None
-db = None
+MONGO_URI = "mongodb://localhost:27017"
+DB_NAME = "course_selling_db"
 
-MONGO_URI = "mongodb://localhost:27017" 
-DB_NAME = "course_selling_db"             
+class MongoDB:
+    def __init__(self, uri: str, db_name: str):
+        self.uri = uri
+        self.db_name = db_name
+        self.client: Optional[AsyncIOMotorClient] = None
+        self.db = None
 
-def connect_db():
-    global client, db
-    client = AsyncIOMotorClient(MONGO_URI)
-    db = client[DB_NAME]
+    async def connect(self):
+        self.client = AsyncIOMotorClient(self.uri)
+        self.db = self.client[self.db_name]
+        # Test connection
+        try:
+            await self.client.admin.command("ping")
+            print("✅ MongoDB connected successfully!")
+        except Exception as e:
+            print("❌ MongoDB connection failed:", e)
 
-def close_db():
-    global client
-    if client:
-        client.close()
+    async def close(self):
+        if self.client:
+            self.client.close()
+            print("MongoDB connection closed.")
+
+# Create a single MongoDB instance
+mongodb = MongoDB(MONGO_URI, DB_NAME)
