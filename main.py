@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from database import connect_db, close_db
-from routers.instructor import router as instructor_router
+from routers import instructor, course, student, enrollment
 
 app = FastAPI(title="Course Selling API")
 
@@ -16,7 +16,7 @@ async def shutdown():
 async def root():
     return {"message: Course Selling API is running"}
 
-app.include_router(instructor_router)
-# app.include_router(student.router)
-# app.include_router(course.router)
-# app.include_router(enrollment.router)
+app.include_router(instructor.router, prefix="/instructors", tags=["Instructors"])
+app.include_router(course.router, prefix="/courses", tags=["Courses"])
+app.include_router(student.router, prefix="/students", tags=["Students"])
+app.include_router(enrollment.router, prefix="/enrollments", tags=["Enrollments"])
