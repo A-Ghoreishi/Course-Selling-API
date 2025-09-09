@@ -1,51 +1,59 @@
-from fastapi import APIRouter, HTTPException
-from crud import instructor as instructor_crud
-from pydantic import BaseModel
-from bson import ObjectId
+# routers/instructor.py
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List
+from crud.instructor import (
+    create_instructor, get_instructor_by_id, list_instructors,
+    update_instructor, delete_instructor
+)
 
-router = APIRouter(prefix="/instructors", tags=["Instructors"])
+router = APIRouter()
 
 class InstructorCreate(BaseModel):
-    name: str
-    email: str
-    courses: list[str] = []
+    first_name: str
+    last_name: str
+    email: EmailStr
+    department: Optional[str] = None
 
 class InstructorUpdate(BaseModel):
-    name: str | None = None
-    email: str | None = None
-    courses: list[str] | None = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    department: Optional[str] = None
 
-def validate_object_id(id_str: str) -> str:
-    try:
-        return str(ObjectId(id_str))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid ID format")
+@router.post("/", status_code=201)
+async def add_instructor(payload: InstructorCreate):
+    return await create_instructor(payload.model_dump())
 
-@router.get("/")
-async def get_instructors():
-    return await instructor_crud.get_all()
+@router.get("/", response_model=list[dict])
+async def get_instructors(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=200)):
+    return await list_instructors(skip=skip, limit=limit)
 
 @router.get("/{instructor_id}")
 async def get_instructor(instructor_id: str):
-    instructor_id = validate_object_id(instructor_id)
-    instructor = await instructor_crud.get_one(instructor_id)
-    if not instructor:
-        raise HTTPException(status_code=404, detail="Instructor not found")
-    return instructor
+    try:
+        found = await get_instructor_by_id(instructor_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid instructor id")
+    if not found:
+        raise HTTPException(404, "Instructor not found")
+    return found
 
-@router.post("/")
-async def create_instructor(data: InstructorCreate):
-    return await instructor_crud.create(data.dict())
-
-@router.put("/{instructor_id}")
-async def update_instructor(instructor_id: str, data: InstructorUpdate):
-    instructor_id = validate_object_id(instructor_id)
-    updated = await instructor_crud.update(instructor_id, data.dict(exclude_none=True))
+@router.patch("/{instructor_id}")
+async def patch_instructor(instructor_id: str, payload: InstructorUpdate):
+    try:
+        updated = await update_instructor(instructor_id, {k: v for k, v in payload.model_dump().items() if v is not None})
+    except ValueError:
+        raise HTTPException(400, "Invalid instructor id")
     if not updated:
-        raise HTTPException(status_code=404, detail="Instructor not found")
+        raise HTTPException(404, "Instructor not found")
     return updated
 
-@router.delete("/{instructor_id}")
-async def delete_instructor(instructor_id: str):
-    instructor_id = validate_object_id(instructor_id)
-    return await instructor_crud.delete(instructor_id)
+@router.delete("/{instructor_id}", status_code=204)
+async def remove_instructor(instructor_id: str):
+    try:
+        ok = await delete_instructor(instructor_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid instructor id")
+    if not ok:
+        raise HTTPException(404, "Instructor not found")

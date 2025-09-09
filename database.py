@@ -1,30 +1,31 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
+from pydantic import BaseModel
+import os
 
-MONGO_URI = "mongodb://localhost:27017"
-DB_NAME = "course_selling_db"
+MONGO_URI = os.getenv("MONGO_URI","mongodb://localhost:27017")
+DB_NAME = os.getenv("DB_NAME","course_selling_db")
 
-class MongoDB:
-    def __init__(self, uri: str, db_name: str):
-        self.uri = uri
-        self.db_name = db_name
-        self.client: Optional[AsyncIOMotorClient] = None
-        self.db = None
+_client: Optional[AsyncIOMotorClient] = None
+db = None  # will be set during startup
 
-    async def connect(self):
-        self.client = AsyncIOMotorClient(self.uri)
-        self.db = self.client[self.db_name]
-        # Test connection
-        try:
-            await self.client.admin.command("ping")
-            print("✅ MongoDB connected successfully!")
-        except Exception as e:
-            print("❌ MongoDB connection failed:", e)
+async def connect_to_mongo() -> None:
+    global _client, db
+    if _client is None:
+        _client = AsyncIOMotorClient(MONGO_URI)
+        db = _client[DB_NAME]
 
-    async def close(self):
-        if self.client:
-            self.client.close()
-            print("MongoDB connection closed.")
+async def close_mongo_connection() -> None:
+    global _client, db
+    if _client:
+        _client.close()
+    _client = None
+    db = None
+
+def get_collection(name: str):
+    if db is None:
+        raise RuntimeError("Database not connected yet!")
+    return db[name]
 
 # Create a single MongoDB instance
-mongodb = MongoDB(MONGO_URI, DB_NAME)
+# mongodb = MongoDB(MONGO_URI, DB_NAME)
